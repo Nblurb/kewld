@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include "2kewld.h"
 
 static int tcp_connect(const char *host, int port) {
@@ -47,11 +49,36 @@ int index_register(const kewld_config_t *cfg) {
         "\r\n"
         "%s",
         KEWLD_INDEX_REGISTER_PATH, KEWLD_INDEX_HOST, blen, KEWLD_VERSION, body);
+
+    /* Connect TCP */
     int fd = tcp_connect(KEWLD_INDEX_HOST, KEWLD_INDEX_PORT);
     if (fd < 0) { log_warn("index_register: connect failed: %s", strerror(errno)); return -1; }
-    write(fd, request, rlen);
-    char resp[512]; ssize_t n = read(fd, resp, sizeof(resp)-1);
+
+    /* Wrap with TLS */
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    if (!ctx) { close(fd); log_warn("index_register: SSL_CTX_new failed"); return -1; }
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_default_verify_paths(ctx);
+
+    SSL *ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, fd);
+    SSL_set_tlsext_host_name(ssl, KEWLD_INDEX_HOST); /* SNI */
+
+    if (SSL_connect(ssl) != 1) {
+        log_warn("index_register: TLS handshake failed");
+        SSL_free(ssl); SSL_CTX_free(ctx); close(fd);
+        return -1;
+    }
+
+    SSL_write(ssl, request, rlen);
+
+    char resp[512];
+    int n = SSL_read(ssl, resp, sizeof(resp) - 1);
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    SSL_CTX_free(ctx);
     close(fd);
+
     if (n <= 0) return -1;
     resp[n] = '\0';
     if (strncmp(resp, "HTTP/1.1 200", 12) == 0 || strncmp(resp, "HTTP/1.1 201", 12) == 0)

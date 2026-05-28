@@ -14,7 +14,7 @@
 #define KEWLD_DEFAULT_SOCKS_PORT 19050
 #define KEWLD_DEFAULT_CTRL_PORT  19051
 #define KEWLD_INDEX_HOST         "2kewl.cc"
-#define KEWLD_INDEX_PORT         80
+#define KEWLD_INDEX_PORT         443
 #define KEWLD_INDEX_REGISTER_PATH "/api/register"
 
 /* ── limits ── */

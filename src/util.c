@@ -57,6 +57,19 @@ int sha256_file(const char *path, char *hex_out) {
     return 0;
 }
 
+int sha256_buf(const unsigned char *data, size_t len, char *hex_out) {
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    if (!ctx) return -1;
+    EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(ctx, data, len);
+    unsigned char hash[32]; unsigned int hlen = 32;
+    EVP_DigestFinal_ex(ctx, hash, &hlen);
+    EVP_MD_CTX_free(ctx);
+    for (int i = 0; i < 32; i++) sprintf(hex_out + i*2, "%02x", hash[i]);
+    hex_out[64] = '\0';
+    return 0;
+}
+
 char *url_decode(const char *in, char *out, size_t outlen) {
     size_t i = 0, j = 0;
     while (in[i] && j < outlen - 1) {

@@ -24,7 +24,8 @@
 #define KEWLD_MAX_NAME           64
 #define KEWLD_MAX_SUBJECT        256
 #define KEWLD_MAX_CONTENT        65536   /* 64 KiB */
-#define KEWLD_MAX_BODY_BYTES     (4 * 1024 * 1024)
+#define KEWLD_MAX_PGP_SIG        8192    /* armored PGP signature */
+#define KEWLD_MAX_BODY_BYTES     (8 * 1024 * 1024)  /* 8 MiB — images need room */
 #define KEWLD_ONION_ADDR_LEN     64      /* v3 .onion incl NUL */
 #define KEWLD_DEFAULT_THREADS    200
 #define KEWLD_DEFAULT_REPLIES    1000
@@ -59,6 +60,7 @@ typedef struct {
     char     content[KEWLD_MAX_CONTENT];
     char     image_hash[65];     /* sha256 hex string, empty if none */
     char     image_ext[8];       /* e.g. ".jpg" */
+    char     pgp_sig[KEWLD_MAX_PGP_SIG]; /* optional armored PGP signature */
     time_t   created_at;
     int      sage;
     int64_t  reply_count;        /* only valid for OP rows */
@@ -110,6 +112,7 @@ void log_warn(const char *fmt, ...);
 void log_err (const char *fmt, ...);
 void daemonize(const char *pid_file);
 int  sha256_file(const char *path, char *hex_out);  /* hex_out: 65 bytes */
+int  sha256_buf(const unsigned char *data, size_t len, char *hex_out); /* hex_out: 65 bytes */
 char *url_decode(const char *in, char *out, size_t outlen);
 char *json_escape(const char *in, char *out, size_t outlen);
 long  current_unix(void);

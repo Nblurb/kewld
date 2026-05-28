@@ -23,6 +23,7 @@ int db_init_schema(sqlite3 *db) {
         "  content    TEXT NOT NULL,"
         "  image_hash TEXT NOT NULL DEFAULT '',"
         "  image_ext  TEXT NOT NULL DEFAULT '',"
+        "  pgp_sig    TEXT NOT NULL DEFAULT '',"
         "  created_at INTEGER NOT NULL,"
         "  last_bump  INTEGER NOT NULL,"
         "  reply_count INTEGER NOT NULL DEFAULT 0,"
@@ -36,6 +37,7 @@ int db_init_schema(sqlite3 *db) {
         "  content    TEXT NOT NULL,"
         "  image_hash TEXT NOT NULL DEFAULT '',"
         "  image_ext  TEXT NOT NULL DEFAULT '',"
+        "  pgp_sig    TEXT NOT NULL DEFAULT '',"
         "  created_at INTEGER NOT NULL,"
         "  sage       INTEGER NOT NULL DEFAULT 0"
         ");"
@@ -44,6 +46,9 @@ int db_init_schema(sqlite3 *db) {
     char *err = NULL;
     int rc = sqlite3_exec(db, sql, NULL, NULL, &err);
     if (rc != SQLITE_OK) { log_err("db_init_schema: %s", err); sqlite3_free(err); return -1; }
+    /* migrate existing databases that lack pgp_sig */
+    sqlite3_exec(db, "ALTER TABLE threads ADD COLUMN pgp_sig TEXT NOT NULL DEFAULT '';", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE posts   ADD COLUMN pgp_sig TEXT NOT NULL DEFAULT '';", NULL, NULL, NULL);
     return 0;
 }
 
@@ -52,8 +57,8 @@ int db_insert_post(sqlite3 *db, kewld_post_t *p) {
     p->created_at = (time_t)now;
     if (p->thread_id == 0) {
         const char *sql =
-            "INSERT INTO threads(name,subject,content,image_hash,image_ext,created_at,last_bump,sage)"
-            " VALUES(?,?,?,?,?,?,?,?);";
+            "INSERT INTO threads(name,subject,content,image_hash,image_ext,pgp_sig,created_at,last_bump,sage)"
+            " VALUES(?,?,?,?,?,?,?,?,?);";
         sqlite3_stmt *st;
         if (sqlite3_prepare_v2(db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
         sqlite3_bind_text(st, 1, p->name,       -1, SQLITE_STATIC);
@@ -61,9 +66,10 @@ int db_insert_post(sqlite3 *db, kewld_post_t *p) {
         sqlite3_bind_text(st, 3, p->content,    -1, SQLITE_STATIC);
         sqlite3_bind_text(st, 4, p->image_hash, -1, SQLITE_STATIC);
         sqlite3_bind_text(st, 5, p->image_ext,  -1, SQLITE_STATIC);
-        sqlite3_bind_int64(st,6, now);
+        sqlite3_bind_text(st, 6, p->pgp_sig,    -1, SQLITE_STATIC);
         sqlite3_bind_int64(st,7, now);
-        sqlite3_bind_int(st, 8, p->sage);
+        sqlite3_bind_int64(st,8, now);
+        sqlite3_bind_int(st, 9, p->sage);
         int rc = sqlite3_step(st);
         sqlite3_finalize(st);
         if (rc != SQLITE_DONE) { log_err("db_insert_post(thread): %s", sqlite3_errmsg(db)); return -1; }
@@ -71,8 +77,8 @@ int db_insert_post(sqlite3 *db, kewld_post_t *p) {
         p->thread_id = p->id;
     } else {
         const char *sql =
-            "INSERT INTO posts(thread_id,name,subject,content,image_hash,image_ext,created_at,sage)"
-            " VALUES(?,?,?,?,?,?,?,?);";
+            "INSERT INTO posts(thread_id,name,subject,content,image_hash,image_ext,pgp_sig,created_at,sage)"
+            " VALUES(?,?,?,?,?,?,?,?,?);";
         sqlite3_stmt *st;
         if (sqlite3_prepare_v2(db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
         sqlite3_bind_int64(st,1, p->thread_id);
@@ -81,8 +87,9 @@ int db_insert_post(sqlite3 *db, kewld_post_t *p) {
         sqlite3_bind_text(st, 4, p->content,    -1, SQLITE_STATIC);
         sqlite3_bind_text(st, 5, p->image_hash, -1, SQLITE_STATIC);
         sqlite3_bind_text(st, 6, p->image_ext,  -1, SQLITE_STATIC);
-        sqlite3_bind_int64(st,7, now);
-        sqlite3_bind_int(st, 8, p->sage);
+        sqlite3_bind_text(st, 7, p->pgp_sig,    -1, SQLITE_STATIC);
+        sqlite3_bind_int64(st,8, now);
+        sqlite3_bind_int(st, 9, p->sage);
         int rc = sqlite3_step(st);
         sqlite3_finalize(st);
         if (rc != SQLITE_DONE) { log_err("db_insert_post(reply): %s", sqlite3_errmsg(db)); return -1; }
@@ -123,7 +130,7 @@ int db_get_threads(sqlite3 *db, int page, kewld_post_t **out, int *count_out) {
     int offset = page * KEWLD_PAGE_SIZE;
     sqlite3_stmt *st;
     sqlite3_prepare_v2(db,
-        "SELECT id,name,subject,content,image_hash,image_ext,created_at,last_bump,reply_count,sage"
+        "SELECT id,name,subject,content,image_hash,image_ext,pgp_sig,created_at,last_bump,reply_count,sage"
         " FROM threads ORDER BY last_bump DESC LIMIT ? OFFSET ?",
         -1, &st, NULL);
     sqlite3_bind_int(st,1,KEWLD_PAGE_SIZE);
@@ -139,10 +146,11 @@ int db_get_threads(sqlite3 *db, int page, kewld_post_t **out, int *count_out) {
         strncpy(p->content,    (const char*)sqlite3_column_text(st,3), sizeof(p->content)-1);
         strncpy(p->image_hash, (const char*)sqlite3_column_text(st,4), sizeof(p->image_hash)-1);
         strncpy(p->image_ext,  (const char*)sqlite3_column_text(st,5), sizeof(p->image_ext)-1);
-        p->created_at  = (time_t)sqlite3_column_int64(st,6);
-        p->last_bump   = (time_t)sqlite3_column_int64(st,7);
-        p->reply_count = sqlite3_column_int64(st,8);
-        p->sage        = sqlite3_column_int(st,9);
+        strncpy(p->pgp_sig,    (const char*)sqlite3_column_text(st,6), sizeof(p->pgp_sig)-1);
+        p->created_at  = (time_t)sqlite3_column_int64(st,7);
+        p->last_bump   = (time_t)sqlite3_column_int64(st,8);
+        p->reply_count = sqlite3_column_int64(st,9);
+        p->sage        = sqlite3_column_int(st,10);
     }
     sqlite3_finalize(st);
     *out = arr; *count_out = n;
@@ -152,7 +160,7 @@ int db_get_threads(sqlite3 *db, int page, kewld_post_t **out, int *count_out) {
 int db_get_thread(sqlite3 *db, int64_t thread_id, kewld_post_t **out, int *count_out) {
     sqlite3_stmt *st;
     sqlite3_prepare_v2(db,
-        "SELECT id,name,subject,content,image_hash,image_ext,created_at,last_bump,reply_count,sage"
+        "SELECT id,name,subject,content,image_hash,image_ext,pgp_sig,created_at,last_bump,reply_count,sage"
         " FROM threads WHERE id=?",
         -1, &st, NULL);
     sqlite3_bind_int64(st,1,thread_id);
@@ -167,14 +175,15 @@ int db_get_thread(sqlite3 *db, int64_t thread_id, kewld_post_t **out, int *count
         strncpy(p->content,    (const char*)sqlite3_column_text(st,3), sizeof(p->content)-1);
         strncpy(p->image_hash, (const char*)sqlite3_column_text(st,4), sizeof(p->image_hash)-1);
         strncpy(p->image_ext,  (const char*)sqlite3_column_text(st,5), sizeof(p->image_ext)-1);
-        p->created_at  = (time_t)sqlite3_column_int64(st,6);
-        p->last_bump   = (time_t)sqlite3_column_int64(st,7);
-        p->reply_count = sqlite3_column_int64(st,8);
-        p->sage        = sqlite3_column_int(st,9);
+        strncpy(p->pgp_sig,    (const char*)sqlite3_column_text(st,6), sizeof(p->pgp_sig)-1);
+        p->created_at  = (time_t)sqlite3_column_int64(st,7);
+        p->last_bump   = (time_t)sqlite3_column_int64(st,8);
+        p->reply_count = sqlite3_column_int64(st,9);
+        p->sage        = sqlite3_column_int(st,10);
     }
     sqlite3_finalize(st);
     sqlite3_prepare_v2(db,
-        "SELECT id,thread_id,name,subject,content,image_hash,image_ext,created_at,sage"
+        "SELECT id,thread_id,name,subject,content,image_hash,image_ext,pgp_sig,created_at,sage"
         " FROM posts WHERE thread_id=? ORDER BY id ASC",
         -1, &st, NULL);
     sqlite3_bind_int64(st,1,thread_id);
@@ -187,8 +196,9 @@ int db_get_thread(sqlite3 *db, int64_t thread_id, kewld_post_t **out, int *count
         strncpy(p->content,    (const char*)sqlite3_column_text(st,4), sizeof(p->content)-1);
         strncpy(p->image_hash, (const char*)sqlite3_column_text(st,5), sizeof(p->image_hash)-1);
         strncpy(p->image_ext,  (const char*)sqlite3_column_text(st,6), sizeof(p->image_ext)-1);
-        p->created_at  = (time_t)sqlite3_column_int64(st,7);
-        p->sage        = sqlite3_column_int(st,8);
+        strncpy(p->pgp_sig,    (const char*)sqlite3_column_text(st,7), sizeof(p->pgp_sig)-1);
+        p->created_at  = (time_t)sqlite3_column_int64(st,8);
+        p->sage        = sqlite3_column_int(st,9);
     }
     sqlite3_finalize(st);
     *out = arr; *count_out = n;

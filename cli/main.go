@@ -121,14 +121,41 @@ func cmdStart(args []string) {
 	tag, bin := parseTagAndBin(args)
 	cfg, err := loadConfig(tag)
 	if err != nil { fatalf("load config for /%s/: %v\nrun: 2kewld-cli init --tag %s\n", tag, err, tag) }
+
+	// Determine pid file path (same logic as cmdStop)
+	pidFile := cfg.PidFile
+	if pidFile == "" {
+		pidFile = filepath.Join(cfg.DataDir, cfg.Tag, "2kewld.pid")
+	}
+
+	// Check if already running
+	if data, err := os.ReadFile(pidFile); err == nil {
+		pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+		if pid > 0 {
+			if proc, err := os.FindProcess(pid); err == nil {
+				if proc.Signal(syscall.Signal(0)) == nil {
+					fatalf("/%s/ is already running (pid %d)\n", tag, pid)
+				}
+			}
+		}
+		os.Remove(pidFile) // stale pid file
+	}
+
 	daemonArgs := buildDaemonArgs(cfg)
 	fmt.Printf("starting 2kewld /%s/ ...\n", cfg.Tag)
 	cmd := exec.Command(bin, daemonArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} // detach from terminal
 	if err := cmd.Start(); err != nil { fatalf("start daemon: %v\n", err) }
-	fmt.Printf("2kewld pid %d\n", cmd.Process.Pid)
-	cmd.Wait()
+
+	// Write pid file
+	os.MkdirAll(filepath.Dir(pidFile), 0700)
+	os.WriteFile(pidFile, []byte(strconv.Itoa(cmd.Process.Pid)+"\n"), 0600)
+
+	fmt.Printf("2kewld /%s/ started (pid %d)\n", cfg.Tag, cmd.Process.Pid)
+	// Don't Wait() — let it run in the background
+	cmd.Process.Release()
 }
 
 func cmdRun(args []string) {
@@ -151,12 +178,15 @@ func cmdStop(args []string) {
 		pidFile = filepath.Join(cfg.DataDir, cfg.Tag, "2kewld.pid")
 	}
 	data, err := os.ReadFile(pidFile)
-	if err != nil { fatalf("read pid file %s: %v\n", pidFile, err) }
+	if err != nil { fatalf("/%s/ does not appear to be running (no pid file at %s)\n", tag, pidFile) }
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
 	if pid == 0 { fatalf("invalid pid in %s\n", pidFile) }
 	proc, err := os.FindProcess(pid)
 	if err != nil { fatalf("find process %d: %v\n", pid, err) }
-	proc.Signal(syscall.SIGTERM)
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		fatalf("signal pid %d: %v\n", pid, err)
+	}
+	os.Remove(pidFile)
 	fmt.Printf("sent SIGTERM to pid %d (/%s/)\n", pid, tag)
 }
 

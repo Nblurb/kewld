@@ -47,7 +47,7 @@ int index_register(const kewld_config_t *cfg) {
         "\r\n"
         "%s",
         KEWLD_INDEX_REGISTER_PATH, KEWLD_INDEX_HOST, blen, KEWLD_VERSION, body);
-    int fd = tcp_connect(KEWLD_INDEX_HOST, 80);
+    int fd = tcp_connect(KEWLD_INDEX_HOST, KEWLD_INDEX_PORT);
     if (fd < 0) { log_warn("index_register: connect failed: %s", strerror(errno)); return -1; }
     write(fd, request, rlen);
     char resp[512]; ssize_t n = read(fd, resp, sizeof(resp)-1);

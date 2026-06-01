@@ -7,14 +7,14 @@
 #include <sqlite3.h>
 
 /* ── version ── */
-#define KEWLD_VERSION            "0.1.0"
+#define KEWLD_VERSION            "0.1.1"
 
 /* ── network ── */
 #define KEWLD_DEFAULT_HTTP_PORT  18080
 #define KEWLD_DEFAULT_ADMIN_PORT 18081   /* local-only admin approval interface */
 #define KEWLD_DEFAULT_SOCKS_PORT 19050
 #define KEWLD_DEFAULT_CTRL_PORT  19051
-#define KEWLD_INDEX_HOST         "kewl.cc"
+#define KEWLD_INDEX_HOST         "2kewl.org"
 #define KEWLD_INDEX_PORT         443
 #define KEWLD_INDEX_REGISTER_PATH "/api/register"
 

@@ -9,7 +9,7 @@
 #include <netdb.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include "2kewld.h"
+#include "kewld.h"
 
 static int tcp_connect(const char *host, int port) {
     struct addrinfo hints, *res;
@@ -44,7 +44,7 @@ int index_register(const kewld_config_t *cfg) {
         "Host: %s\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %d\r\n"
-        "User-Agent: 2kewld/%s\r\n"
+        "User-Agent: kewld/%s\r\n"
         "Connection: close\r\n"
         "\r\n"
         "%s",

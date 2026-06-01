@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <openssl/evp.h>
-#include "2kewld.h"
+#include "kewld.h"
 
 static void vlog(const char *level, const char *fmt, va_list ap) {
     time_t t = time(NULL);

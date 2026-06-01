@@ -14,7 +14,7 @@ import (
 )
 
 const version = "0.1.0"
-const defaultBin = "./2kewld"
+const defaultBin = "./kewld"
 
 type Config struct {
 	Tag          string `json:"tag"`
@@ -25,6 +25,8 @@ type Config struct {
 	SocksPort    int    `json:"socks_port"`
 	CtrlPort     int    `json:"ctrl_port"`
 	NoImages     bool   `json:"no_images"`
+	AdminPort    int    `json:"admin_port"`
+	AdminToken   string `json:"admin_token"`
 	NSFW         bool   `json:"nsfw"`
 	NoRegister   bool   `json:"no_register"`
 	Daemon       bool   `json:"daemon"`
@@ -38,8 +40,8 @@ func defaultConfig() Config {
 	home, _ := os.UserHomeDir()
 	return Config{
 		Title:      "Anonymous Board",
-		Desc:       "A 2kewl board.",
-		DataDir:    filepath.Join(home, ".2kewld"),
+		Desc:       "A kewl board.",
+		DataDir:    filepath.Join(home, ".kewld"),
 		Port:       18080,
 		SocksPort:  19050,
 		CtrlPort:   19051,
@@ -50,7 +52,7 @@ func defaultConfig() Config {
 
 func configPath(tag string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".2kewld", tag, "kewld.json")
+	return filepath.Join(home, ".kewld", tag, "kewld.json")
 }
 
 func loadConfig(tag string) (Config, error) {
@@ -83,6 +85,8 @@ func buildDaemonArgs(cfg Config) []string {
 		"--max-replies",strconv.Itoa(cfg.MaxReplies),
 	}
 	if cfg.NoImages   { args = append(args, "--no-images") }
+	if cfg.AdminPort != 0 { args = append(args, "--admin-port", fmt.Sprintf("%d", cfg.AdminPort)) }
+	if cfg.AdminToken != "" { args = append(args, "--admin-token", cfg.AdminToken) }
 	if cfg.NSFW       { args = append(args, "--nsfw") }
 	if cfg.NoRegister { args = append(args, "--no-register") }
 	if cfg.Daemon     { args = append(args, "--daemon") }
@@ -120,12 +124,12 @@ func cmdInit(args []string) {
 func cmdStart(args []string) {
 	tag, bin := parseTagAndBin(args)
 	cfg, err := loadConfig(tag)
-	if err != nil { fatalf("load config for /%s/: %v\nrun: 2kewld-cli init --tag %s\n", tag, err, tag) }
+	if err != nil { fatalf("load config for /%s/: %v\nrun: kewld-cli init --tag %s\n", tag, err, tag) }
 
 	// Determine pid file path (same logic as cmdStop)
 	pidFile := cfg.PidFile
 	if pidFile == "" {
-		pidFile = filepath.Join(cfg.DataDir, cfg.Tag, "2kewld.pid")
+		pidFile = filepath.Join(cfg.DataDir, cfg.Tag, "kewld.pid")
 	}
 
 	// Check if already running
@@ -142,7 +146,7 @@ func cmdStart(args []string) {
 	}
 
 	daemonArgs := buildDaemonArgs(cfg)
-	fmt.Printf("starting 2kewld /%s/ ...\n", cfg.Tag)
+	fmt.Printf("starting kewld /%s/ ...\n", cfg.Tag)
 	cmd := exec.Command(bin, daemonArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -153,7 +157,7 @@ func cmdStart(args []string) {
 	os.MkdirAll(filepath.Dir(pidFile), 0700)
 	os.WriteFile(pidFile, []byte(strconv.Itoa(cmd.Process.Pid)+"\n"), 0600)
 
-	fmt.Printf("2kewld /%s/ started (pid %d)\n", cfg.Tag, cmd.Process.Pid)
+	fmt.Printf("kewld /%s/ started (pid %d)\n", cfg.Tag, cmd.Process.Pid)
 	// Don't Wait() — let it run in the background
 	cmd.Process.Release()
 }
@@ -163,7 +167,7 @@ func cmdRun(args []string) {
 	cfg, err := loadConfig(tag)
 	if err != nil { fatalf("load config: %v\n", err) }
 	daemonArgs := buildDaemonArgs(cfg)
-	fmt.Printf("exec 2kewld /%s/\n", cfg.Tag)
+	fmt.Printf("exec kewld /%s/\n", cfg.Tag)
 	binPath, _ := exec.LookPath(bin)
 	if binPath == "" { binPath = bin }
 	syscall.Exec(binPath, append([]string{binPath}, daemonArgs...), os.Environ())
@@ -175,7 +179,7 @@ func cmdStop(args []string) {
 	if err != nil { fatalf("load config: %v\n", err) }
 	pidFile := cfg.PidFile
 	if pidFile == "" {
-		pidFile = filepath.Join(cfg.DataDir, cfg.Tag, "2kewld.pid")
+		pidFile = filepath.Join(cfg.DataDir, cfg.Tag, "kewld.pid")
 	}
 	data, err := os.ReadFile(pidFile)
 	if err != nil { fatalf("/%s/ does not appear to be running (no pid file at %s)\n", tag, pidFile) }
@@ -218,7 +222,7 @@ func cmdInfo(args []string) {
 
 func cmdList(_ []string) {
 	home, _ := os.UserHomeDir()
-	base := filepath.Join(home, ".2kewld")
+	base := filepath.Join(home, ".kewld")
 	entries, err := os.ReadDir(base)
 	if err != nil { fmt.Println("no boards found"); return }
 	fmt.Println("boards:")
@@ -267,12 +271,12 @@ func cmdSet(args []string) {
 }
 
 func usage() {
-	fmt.Printf(`2kewld-cli v%s — 2Kewl Onion Daemon CLI
+	fmt.Printf(`kewld-cli v%s — Kewl Onion Daemon CLI
 
 Commands:
   init    --tag <tag> [options]   Initialize a new board config
-  start   <tag> [--bin <path>]    Start 2kewld for a board
-  run     <tag> [--bin <path>]    Exec 2kewld (replaces this process)
+  start   <tag> [--bin <path>]    Start kewld for a board
+  run     <tag> [--bin <path>]    Exec kewld (replaces this process)
   stop    <tag>                   Send SIGTERM to running daemon
   status  <tag>                   Check if daemon is online
   info    <tag>                   Show config + onion address

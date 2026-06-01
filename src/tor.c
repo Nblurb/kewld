@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "2kewld.h"
+#include "kewld.h"
 
 static pid_t tor_pid = 0;
 

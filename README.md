@@ -1,11 +1,11 @@
-# 2kewld
+# kewld
 
-The 2Kewl Onion Daemon — runs a board node over Tor.
+The Kewl Onion Daemon — runs a board node over Tor.
 
 ## Components
 
-- `2kewld`     — C daemon, HTTP API over Tor hidden service
-- `2kewld-cli` — Go CLI to configure and manage 2kewld
+- `kewld`     — C daemon, HTTP API over Tor hidden service
+- `kewld-cli` — Go CLI to configure and manage kewld
 
 ## Dependencies
 
@@ -18,9 +18,9 @@ The 2Kewl Onion Daemon — runs a board node over Tor.
 ## Build
 
 ```sh
-make            # builds both 2kewld and 2kewld-cli
-make daemon     # builds only 2kewld
-make cli        # builds only 2kewld-cli
+make            # builds both kewld and kewld-cli
+make daemon     # builds only kewld
+make cli        # builds only kewld-cli
 make clean
 ```
 
@@ -28,11 +28,11 @@ make clean
 
 ```sh
 # Configure and launch a board
-./2kewld-cli init --tag tech --title "Technology" --desc "Tech discussion"
-./2kewld-cli start
+./kewld-cli init --tag tech --title "Technology" --desc "Tech discussion"
+./kewld-cli start
 
 # Or run the daemon directly
-./2kewld --tag tech --title "Technology" --data-dir ~/.2kewld/tech
+./kewld --tag tech --title "Technology" --data-dir ~/.kewld/tech
 ```
 
 ## API Endpoints (onion)

@@ -151,7 +151,7 @@ static const char *ADMIN_CSS =
     ".reject{background:#a22;color:#fff;border:none;padding:4px 12px;cursor:pointer;border-radius:3px}"
     ".badge-p{background:#555;color:#fff;padding:2px 6px;border-radius:3px;font-size:.75rem}"
     ".none{color:#555;font-style:italic}"
-    "img,video{max-width:180px;max-height:120px;display:block}"
+    "img,video{width:200px;height:200px;object-fit:contain;background:#888;display:block}"
     "form{display:inline}";
 
 /* Serve admin dashboard page */
